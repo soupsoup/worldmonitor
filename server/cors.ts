@@ -13,8 +13,10 @@ const PRODUCTION_PATTERNS: RegExp[] = [
   /^https:\/\/worldmonitor-[a-z0-9-]+-elie-[a-z0-9]+\.vercel\.app$/,
   /^https:\/\/[a-z0-9-]+-worldmonitor-[a-z0-9-]+\.vercel\.app$/,
   /^https:\/\/[a-z0-9-]+-anthony-derosas-projects\.vercel\.app$/,
-  /^https?:\/\/tauri\.localhost(:\d+)?$/,
-  /^https?:\/\/[a-z0-9-]+\.tauri\.localhost(:\d+)?$/i,
+  /^https:\/\/discord\.com$/,
+  /^https:\/\/discord\.gg$/,
+  /^https:\/\/tauri\.localhost(:\d+)?$/,
+  /^https:\/\/[a-z0-9-]+\.tauri\.localhost(:\d+)?$/i,
   /^tauri:\/\/localhost$/,
   /^asset:\/\/localhost$/,
 ];
