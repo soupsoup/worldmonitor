@@ -4,6 +4,8 @@ const ALLOWED_ORIGIN_PATTERNS = [
   /^https:\/\/worldmonitor-[a-z0-9-]+-elie-[a-z0-9]+\.vercel\.app$/,
   /^https:\/\/[a-z0-9-]+-worldmonitor-[a-z0-9-]+\.vercel\.app$/,
   /^https:\/\/[a-z0-9-]+-anthony-derosas-projects\.vercel\.app$/,
+  /^https:\/\/discord\.com$/,
+  /^https:\/\/discord\.gg$/,
   /^https?:\/\/localhost(:\d+)?$/,
   /^https?:\/\/127\.0\.0\.1(:\d+)?$/,
   /^https?:\/\/tauri\.localhost(:\d+)?$/,
