@@ -199,12 +199,20 @@ async function handleSearch(interaction: Record<string, any>): Promise<Response>
 // ---------------------------------------------------------------------------
 
 export default async function handler(req: Request): Promise<Response> {
-  if (req.method !== 'POST') {
-    return new Response('Method Not Allowed', { status: 405 });
+  if (req.method === 'GET') {
+    const challenge = new URL(req.url).searchParams.get('challenge');
+    if (challenge) {
+      return new Response(challenge, { headers: { 'Content-Type': 'text/plain' } });
+    }
+    return new Response('Discord Interactions Endpoint', { status: 200 });
   }
 
   if (!DISCORD_PUBLIC_KEY) {
     return new Response('Discord public key not configured', { status: 500 });
+  }
+
+  if (req.method !== 'POST') {
+    return new Response('Method Not Allowed', { status: 405 });
   }
 
   const signature = req.headers.get('x-signature-ed25519') ?? '';
