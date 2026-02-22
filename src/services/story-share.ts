@@ -89,7 +89,16 @@ export const shareTexts = {
     `${data.cii?.change24h ? `📉 24h: *${data.cii.change24h > 0 ? '+' : ''}${data.cii.change24h}*\n` : ''}` +
     `${data.threats.critical > 0 ? `🚨 Critical: *${data.threats.critical}*\n` : ''}` +
     `${data.threats.high > 0 ? `🔴 High: *${data.threats.high}*\n` : ''}` +
-    `\n🔗 ${generateStoryDeepLink(data.countryCode, 'ciianalysis', data.cii?.score, data.cii?.level)}`
+    `\n🔗 ${generateStoryDeepLink(data.countryCode, 'ciianalysis', data.cii?.score, data.cii?.level)}`,
+
+  discord: (data: StoryData) =>
+    `**${countryFlag(data.countryCode)} ${data.countryName} Intelligence Brief**\n\n` +
+    `**Instability:** ${data.cii?.score || 'N/A'}/100 (${data.cii?.level || 'N/A'})\n` +
+    `**Trend:** ${data.cii?.trend || 'stable'}\n` +
+    `${data.cii?.change24h ? `**24h change:** ${data.cii.change24h > 0 ? '+' : ''}${data.cii.change24h}\n` : ''}` +
+    `${data.threats.critical > 0 ? `**Critical threats:** ${data.threats.critical}\n` : ''}` +
+    `${data.threats.high > 0 ? `**High threats:** ${data.threats.high}\n` : ''}` +
+    `\n${generateStoryDeepLink(data.countryCode, 'ciianalysis', data.cii?.score, data.cii?.level)}`,
 };
 
 // Pre-generated share URLs
@@ -104,5 +113,8 @@ export function getShareUrls(data: StoryData): Record<string, string> {
     facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`,
     whatsapp: `https://wa.me/?text=${encodeURIComponent(shareTexts.whatsapp(data).replace('\n', '%0A'))}`,
     telegram: `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(shareTexts.telegram(data).replace('\n', '%0A'))}`,
+    // Discord doesn't have a web share intent URL; copy the formatted text to clipboard instead.
+    // The caller should handle the 'discord' key by invoking navigator.clipboard.writeText().
+    discord: shareTexts.discord(data),
   };
 }
