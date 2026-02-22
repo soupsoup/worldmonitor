@@ -97,7 +97,8 @@ export async function upsertGuild(guild: DiscordGuild): Promise<void> {
   if (!db) return;
   await db
     .from('discord_guilds')
-    .upsert(guild, { onConflict: 'guild_id' });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .upsert(guild as any, { onConflict: 'guild_id' });
 }
 
 export async function deleteGuild(guildId: string): Promise<void> {
@@ -119,8 +120,9 @@ export async function upsertSubscription(
   if (!db) return null;
   const { data, error } = await db
     .from('discord_subscriptions')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .upsert(
-      { ...sub, updated_at: new Date().toISOString() },
+      { ...sub, updated_at: new Date().toISOString() } as any,
       { onConflict: 'guild_id,channel_id' },
     )
     .select()
