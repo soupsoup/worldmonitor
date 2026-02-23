@@ -1,0 +1,92 @@
+name: Earthquake Alerts
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'  # Every 10 minutes
+  workflow_dispatch:
+
+jobs:
+  earthquake-alert:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch latest earthquakes
+        id: fetch
+        run: |
+          # Get M4.5+ earthquakes from the past hour
+          EARTHQUAKES=$(curl -s "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/4.5_hour.geojson")
+          
+          # Save to temp file for comparison
+          echo "$EARTHQUAKES" > earthquakes_new.json
+          
+          # Check if we have previous data
+          if [ -f earthquakes_prev.json ]; then
+            # Compare - get new earthquakes
+            PREV_COUNT=$(jq '.features | length' earthquakes_prev.json 2>/dev/null || echo "0")
+            NEW_COUNT=$(jq '.features | length' earthquakes_new.json)
+            
+            echo "Previous: $PREV_COUNT, New: $NEW_COUNT"
+            echo "prev_count=$PREV_COUNT" >> $GITHUB_OUTPUT
+            echo "new_count=$NEW_COUNT" >> $GITHUB_OUTPUT
+          else
+            echo "prev_count=0" >> $GITHUB_OUTPUT
+            echo "new_count=0" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check for significant new earthquakes
+        id: alert
+        if: steps.fetch.outputs.new_count != '0'
+        run: |
+          # Get the most recent earthquake (first in list)
+          MAG=$(jq -r '.features[0].properties.mag' earthquakes_new.json)
+          PLACE=$(jq -r '.features[0].properties.place' earthquakes_new.json)
+          URL=$(jq -r '.features[0].properties.url' earthquakes_new.json)
+          TIME=$(jq -r '.features[0].properties.time' earthquakes_new.json)
+          
+          # Convert timestamp to readable time
+          READABLE_TIME=$(date -d @$(($TIME / 1000)) -u '+%Y-%m-%d %H:%M UTC')
+          
+          echo "New earthquake detected!"
+          echo "Magnitude: $MAG"
+          echo "Location: $PLACE"
+          
+          # Set outputs for next step
+          echo "magnitude=$MAG" >> $GITHUB_OUTPUT
+          echo "place=$PLACE" >> $GITHUB_OUTPUT
+          echo "url=$URL" >> $GITHUB_OUTPUT
+          echo "time=$READABLE_TIME" >> $GITHUB_OUTPUT
+
+      - name: Send Discord Webhook
+        if: steps.alert.outputs.magnitude != ''
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          # Determine color based on magnitude
+          if [ $(echo "${{ steps.alert.outputs.magnitude }} >= 6.0" | bc -l) -eq 1 ]; then
+            COLOR="16711680"  # Red for 6.0+
+          elif [ $(echo "${{ steps.alert.outputs.magnitude }} >= 5.0" | bc -l) -eq 1 ]; then
+            COLOR="16744448"  # Orange for 5.0-5.9
+          else
+            COLOR="16744448"  # Yellow for 4.5-4.9
+          fi
+          
+          # Send webhook
+          curl -s -X POST "$DISCORD_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "embeds": [{
+                "title": "🌋 Earthquake Alert: M${{ steps.alert.outputs.magnitude }}",
+                "description": "${{ steps.alert.outputs.place }}",
+                "color": "'$COLOR'",
+                "fields": [
+                  {"name": "Magnitude", "value": "${{ steps.alert.outputs.magnitude }}", "inline": true},
+                  {"name": "Time", "value": "${{ steps.alert.outputs.time }}", "inline": true}
+                ],
+                "url": "${{ steps.alert.outputs.url }}"
+              }]
+            }'
+
+      - name: Save current data for next run
+        run: |
+          mv earthquakes_new.json earthquakes_prev.json
