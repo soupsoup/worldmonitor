@@ -36,40 +36,44 @@ jobs:
       - name: Fetch latest from SentDefender
         if: github.event.inputs.test_alert != 'true'
         run: |
-          set +e
+          # Use RSSHub on Vercel
+          RSSHUB_URL="https://rsshub-five-swart.vercel.app/twitter/user/sentdefender"
           
-          # Fetch RSS feed from Nitter
-          curl -s --max-time 15 "https://nitter.net/sentdefender/rss" > feed.xml
+          # Fetch RSS feed
+          curl -s --max-time 20 "$RSSHUB_URL" > feed.xml
           
           if [ ! -s feed.xml ]; then
             echo "Failed to fetch feed"
             exit 0
           fi
           
-          # Get first tweet
-          FIRST_GUID=$(grep -oP '<guid[^>]*>[^<]*</guid>' feed.xml | head -1 | sed 's/<[^>]*>//g')
-          FIRST_TITLE=$(grep -oP '<title>[^<]*</title>' feed.xml | head -1 | sed 's/<title>//g;s/<\/title>//g')
-          STATUS_ID=$(echo "$FIRST_GUID" | sed 's/[^0-9]//g')
-          X_LINK="https://x.com/sentdefender/status/$STATUS_ID"
+          # Extract first item
+          TITLE=$(grep -oP '<title><!\[CDATA\[.*?\]\]></title>|<title>.*?</title>' feed.xml | head -1 | sed 's/<title>//g;s/<\/title>//g;s/<!\[CDATA\[//g;s/\]\]>//g')
+          LINK=$(grep -oP '<link>.*?</link>' feed.xml | head -1 | sed 's/<link>//g;s/<\/link>//g')
           
-          echo "Latest tweet: $FIRST_TITLE"
-          echo "Link: $X_LINK"
-          
-          # Send to Discord
-          # Truncate if too long
-          TITLE="$FIRST_TITLE"
-          if [ ${#TITLE} -gt 200 ]; then
-            TITLE="${TITLE:0:197}..."
+          if [ -z "$TITLE" ]; then
+            echo "No tweet content found"
+            exit 0
           fi
           
+          echo "Tweet: $TITLE"
+          echo "Link: $LINK"
+          
+          # Truncate if too long
+          TWEET="$TITLE"
+          if [ ${#TWEET} -gt 200 ]; then
+            TWEET="${TWEET:0:197}..."
+          fi
+          
+          # Send to Discord
           curl -s -X POST "${{ secrets.DISCORD_WEBHOOK_NEWS }}" \
             -H "Content-Type: application/json" \
             -d '{
               "embeds": [{
                 "title": "🛡️ SentDefender",
-                "description": "'"$TITLE"'",
+                "description": "'"$TWEET"'",
                 "color": "3447003",
-                "url": "'"$X_LINK"'"
+                "url": "'"$LINK"'"
               }]
             }'
           
