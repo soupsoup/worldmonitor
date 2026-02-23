@@ -74,11 +74,8 @@ jobs:
               TIME=$(echo "$STORY" | jq -r '.time // 0')
               
               if [ -n "$TITLE" ]; then
-                # Filter for tech/security/current events
-                if echo "$TITLE" | grep -qiE "(ai|cyber|security|hack|tech|google|microsoft|openai|meta|amazon|apple|startup|investor|估值|funding|launch|release|product|announce|election|trump|biden|putin|war|military|china|russia|ukraine|israel|iran|north korea|korea|congress|senate|court|bitcoin|ethereum|crypto|stock|market|economy)"; then
-                  ARTICLES="$ARTICLES,{\"title\":\"$TITLE\",\"url\":\"$URL\",\"score\":$SCORE,\"time\":$TIME}"
-                  COUNT=$((COUNT + 1))
-                fi
+                ARTICLES="$ARTICLES,{\"title\":\"$TITLE\",\"url\":\"$URL\",\"score\":$SCORE,\"time\":$TIME}"
+                COUNT=$((COUNT + 1))
               fi
             fi
           done
