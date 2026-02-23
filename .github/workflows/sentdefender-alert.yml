@@ -33,19 +33,7 @@ jobs:
             }'
           echo "Test alert sent!"
 
-      - uses: actions/checkout@v4
-        if: github.event.inputs.test_alert != 'true'
-
-      - name: Restore previous data
-        if: github.event.inputs.test_alert != 'true'
-        uses: actions/cache@v4
-        with:
-          path: sentdefender_prev.txt
-          key: sentdefender-data
-          restore-keys: sentdefender-data
-
       - name: Fetch latest from SentDefender
-        id: fetch
         if: github.event.inputs.test_alert != 'true'
         run: |
           set +e
@@ -58,78 +46,31 @@ jobs:
             exit 0
           fi
           
-          # Get first tweet ID and title
+          # Get first tweet
           FIRST_GUID=$(grep -oP '<guid[^>]*>[^<]*</guid>' feed.xml | head -1 | sed 's/<[^>]*>//g')
           FIRST_TITLE=$(grep -oP '<title>[^<]*</title>' feed.xml | head -1 | sed 's/<title>//g;s/<\/title>//g')
-          FIRST_LINK=$(grep -oP '<link[^>]*>[^<]*</link>' feed.xml | head -1 | sed 's/<[^>]*>//g')
-          FIRST_LINK="https://x.com/sentdefender/status/$(echo "$FIRST_GUID" | sed 's/[^0-9]//g')"
-          
-          echo "guid=$FIRST_GUID" > current.txt
-          echo "title=$FIRST_TITLE" >> current.txt
-          echo "link=$FIRST_LINK" >> current.txt
+          STATUS_ID=$(echo "$FIRST_GUID" | sed 's/[^0-9]//g')
+          X_LINK="https://x.com/sentdefender/status/$STATUS_ID"
           
           echo "Latest tweet: $FIRST_TITLE"
-          echo "guid=$FIRST_GUID" >> $GITHUB_OUTPUT
-
-      - name: Check for new tweets
-        id: check
-        if: github.event.inputs.test_alert != 'true'
-        run: |
-          if [ -f sentdefender_prev.txt ]; then
-            PREV_GUID=$(cat sentdefender_prev.txt | grep "guid=" | sed 's/guid=//')
-            CURR_GUID=$(cat current.txt | grep "guid=" | sed 's/guid=//')
-            
-            if [ "$CURR_GUID" != "$PREV_GUID" ]; then
-              echo "New tweet detected!"
-              TITLE=$(cat current.txt | grep "title=" | sed 's/title=//')
-              LINK=$(cat current.txt | grep "link=" | sed 's/link=//')
-              
-              echo "title=$TITLE" >> $GITHUB_OUTPUT
-              echo "link=$LINK" >> $GITHUB_OUTPUT
-              echo "has_new=true" >> $GITHUB_OUTPUT
-            else
-              echo "No new tweets"
-              echo "has_new=false" >> $GITHUB_OUTPUT
-            fi
-          else
-            echo "First run - saving data"
-            echo "has_new=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Send Discord Webhook
-        if: github.event.inputs.test_alert != 'true' && steps.check.outputs.has_new == 'true'
-        env:
-          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_NEWS }}
-        run: |
-          TITLE="${{ steps.check.outputs.title }}"
-          LINK="${{ steps.check.outputs.link }}"
+          echo "Link: $X_LINK"
           
+          # Send to Discord
           # Truncate if too long
+          TITLE="$FIRST_TITLE"
           if [ ${#TITLE} -gt 200 ]; then
             TITLE="${TITLE:0:197}..."
           fi
           
-          curl -s -X POST "$DISCORD_WEBHOOK_URL" \
+          curl -s -X POST "${{ secrets.DISCORD_WEBHOOK_NEWS }}" \
             -H "Content-Type: application/json" \
             -d '{
               "embeds": [{
                 "title": "🛡️ SentDefender",
                 "description": "'"$TITLE"'",
                 "color": "3447003",
-                "url": "'"$LINK"'"
+                "url": "'"$X_LINK"'"
               }]
             }'
+          
           echo "Alert sent!"
-
-      - name: Save current data
-        if: github.event.inputs.test_alert != 'true'
-        run: |
-          cat current.txt > sentdefender_prev.txt
-          echo "Saved for next run"
-
-      - uses: actions/cache@v4
-        if: github.event.inputs.test_alert != 'true'
-        with:
-          path: sentdefender_prev.txt
-          key: sentdefender-data
-          save-always: true
