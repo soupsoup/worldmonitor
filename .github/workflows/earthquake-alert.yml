@@ -11,27 +11,29 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Restore previous earthquake data
+        id: restore
+        uses: actions/cache@v4
+        with:
+          path: earthquakes_prev.json
+          key: earthquake-data
+
       - name: Fetch latest earthquakes
         id: fetch
         run: |
           # Get M4.5+ earthquakes from the past hour
-          EARTHQUAKES=$(curl -s "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/4.5_hour.geojson")
+          curl -s "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/4.5_hour.geojson" > earthquakes_new.json
           
-          # Save to temp file for comparison
-          echo "$EARTHQUAKES" > earthquakes_new.json
+          NEW_COUNT=$(jq '.features | length' earthquakes_new.json)
+          echo "new_count=$NEW_COUNT" >> $GITHUB_OUTPUT
           
-          # Check if we have previous data
+          # Check if we have previous data cached
           if [ -f earthquakes_prev.json ]; then
-            # Compare - get new earthquakes
             PREV_COUNT=$(jq '.features | length' earthquakes_prev.json 2>/dev/null || echo "0")
-            NEW_COUNT=$(jq '.features | length' earthquakes_new.json)
-            
             echo "Previous: $PREV_COUNT, New: $NEW_COUNT"
             echo "prev_count=$PREV_COUNT" >> $GITHUB_OUTPUT
-            echo "new_count=$NEW_COUNT" >> $GITHUB_OUTPUT
           else
             echo "prev_count=0" >> $GITHUB_OUTPUT
-            echo "new_count=0" >> $GITHUB_OUTPUT
           fi
 
       - name: Check for significant new earthquakes
@@ -87,6 +89,9 @@ jobs:
               }]
             }'
 
-      - name: Save current data for next run
-        run: |
-          mv earthquakes_new.json earthquakes_prev.json
+      - name: Save current earthquake data
+        uses: actions/cache@v4
+        with:
+          path: earthquakes_prev.json
+          key: earthquake-data
+          save-always: true
