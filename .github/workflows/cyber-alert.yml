@@ -1,0 +1,124 @@
+name: Cyber Threat Alerts
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'  # Every 15 minutes
+  workflow_dispatch:
+    inputs:
+      test_alert:
+        description: 'Send test alert'
+        required: false
+        default: 'false'
+
+jobs:
+  cyber-alert:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send test alert
+        if: github.event.inputs.test_alert == 'true'
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          curl -s -X POST "$DISCORD_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "embeds": [{
+                "title": "🔒 Cyber Threat Alert - Test",
+                "description": "Cyber threat alert system is working!",
+                "color": "16711680",
+                "fields": [
+                  {"name": "Status", "value": "Test successful", "inline": true}
+                ]
+              }]
+            }'
+          echo "Test alert sent!"
+
+      - uses: actions/checkout@v4
+        if: github.event.inputs.test_alert != 'true'
+
+      - name: Restore previous data
+        if: github.event.inputs.test_alert != 'true'
+        uses: actions/cache@v4
+        with:
+          path: cyber_prev.json
+          key: cyber-threat-data
+
+      - name: Fetch latest cyber threats from URLhaus
+        id: fetch
+        if: github.event.inputs.test_alert != 'true'
+        run: |
+          # Fetch recent malware URLs from URLhaus (free, public)
+          sleep 1
+          curl -s "https://urlhaus-api.abuse.ch/v1/urls/recent/limit/10/" \
+            -H "Accept: application/json" > urlhaus_new.json
+          
+          # Check if we got valid JSON
+          if jq -e '.urls > 0' urlhaus_new.json 2>/dev/null; then
+            NEW_COUNT=$(jq '.urls | length' urlhaus_new.json)
+            echo "New threats: $NEW_COUNT"
+            echo "new_count=$NEW_COUNT" >> $GITHUB_OUTPUT
+          else
+            echo "0" > urlhaus_new.json
+            echo "new_count=0" >> $GITHUB_OUTPUT
+            echo "API error or no data"
+          fi
+
+      - name: Check for new threats
+        id: check
+        if: github.event.inputs.test_alert != 'true' && steps.fetch.outputs.new_count != '0'
+        run: |
+          # Get the most recent threat
+          FIRST_ID=$(jq -r '.urls[0].id' urlhaus_new.json)
+          
+          if [ -f cyber_prev.json ]; then
+            PREV_ID=$(jq -r '.urls[0].id' cyber_prev.json 2>/dev/null || echo "")
+            
+            if [ "$FIRST_ID" != "$PREV_ID" ]; then
+              echo "New threat detected!"
+              THREAT=$(jq -r '.urls[0].url' urlhaus_new.json)
+              MALWARE=$(jq -r '.urls[0].malware_variant[0]' urlhaus_new.json)
+              STATUS=$(jq -r '.urls[0].url_status' urlhaus_new.json)
+              DATE=$(jq -r '.urls[0].date_added' urlhaus_new.json)
+              
+              echo "threat=$THREAT" >> $GITHUB_OUTPUT
+              echo "malware=$MALWARE" >> $GITHUB_OUTPUT
+              echo "status=$STATUS" >> $GITHUB_OUTPUT
+              echo "date=$DATE" >> $GITHUB_OUTPUT
+              echo "has_new=true" >> $GITHUB_OUTPUT
+            else
+              echo "No new threats"
+              echo "has_new=false" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "First run - saving data"
+            echo "has_new=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Send Discord Webhook
+        if: github.event.inputs.test_alert != 'true' && steps.check.outputs.has_new == 'true'
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          curl -s -X POST "$DISCORD_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "embeds": [{
+                "title": "🔒 Cyber Threat Detected",
+                "description": "${{ steps.check.outputs.threat }}",
+                "color": "16711680",
+                "fields": [
+                  {"name": "Malware", "value": "${{ steps.check.outputs.malware }}", "inline": true},
+                  {"name": "Status", "value": "${{ steps.check.outputs.status }}", "inline": true},
+                  {"name": "Date", "value": "${{ steps.check.outputs.date }}", "inline": true}
+                ]
+              }]
+            }'
+          echo "Alert sent!"
+
+      - name: Save current data
+        if: github.event.inputs.test_alert != 'true'
+        uses: actions/cache@v4
+        with:
+          path: urlhaus_new.json
+          key: cyber-threat-data
+          save-always: true
