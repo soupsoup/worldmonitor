@@ -33,127 +33,47 @@ jobs:
             }'
           echo "Test alert sent!"
 
-      - uses: actions/checkout@v4
-        if: github.event.inputs.test_alert != 'true'
-
-      - name: Restore previous data
-        if: github.event.inputs.test_alert != 'true'
-        uses: actions/cache@v4
-        with:
-          path: news_prev.json
-          key: hn-news-data
-          restore-keys: hn-news-data
-
       - name: Fetch latest news from Hacker News
         id: fetch
         if: github.event.inputs.test_alert != 'true'
         run: |
           set +e
           
-          echo "Fetching top stories..."
           TOP_STORIES=$(curl -s --max-time 10 "https://hacker-news.firebaseio.com/v0/topstories.json")
           
-          echo "Top stories response: ${TOP_STORIES:0:100}"
-          
           if [ -z "$TOP_STORIES" ] || [ "$TOP_STORIES" = "null" ]; then
-            echo '{"articles": []}' > news_new.json
-            echo "new_count=0" >> $GITHUB_OUTPUT
-            echo "Failed to fetch HN stories"
+            echo "Failed to fetch HN"
             exit 0
           fi
           
-          # Get first 5 story IDs
-          STORY_IDS=$(echo "$TOP_STORIES" | jq -r '.[:5] | .[]' 2>/dev/null)
+          # Get top 3 stories
+          STORY_IDS=$(echo "$TOP_STORIES" | jq -r '.[:3] | .[]')
           
-          echo "Story IDs: $STORY_IDS"
-          
-          ARTICLES="["
-          COUNT=0
           for ID in $STORY_IDS; do
-            echo "Fetching story $ID..."
             STORY=$(curl -s --max-time 5 "https://hacker-news.firebaseio.com/v0/item/$ID.json")
             if [ -n "$STORY" ] && [ "$STORY" != "null" ]; then
               TITLE=$(echo "$STORY" | jq -r '.title // empty' 2>/dev/null)
               URL=$(echo "$STORY" | jq -r '.url // empty' 2>/dev/null)
               SCORE=$(echo "$STORY" | jq -r '.score // 0' 2>/dev/null)
               
-              if [ -n "$TITLE" ]; then
+              if [ -n "$TITLE" ] && [ -n "$URL" ]; then
                 echo "Found: $TITLE"
-                ARTICLES="$ARTICLES{\"title\":\"$TITLE\",\"url\":\"$URL\",\"score\":$SCORE},"
-                COUNT=$((COUNT + 1))
+                # Send alert for each top story
+                curl -s -X POST "${{ secrets.DISCORD_WEBHOOK_NEWS }}" \
+                  -H "Content-Type: application/json" \
+                  -d '{
+                    "embeds": [{
+                      "title": "📰 News Alert",
+                      "description": "'"$TITLE"'",
+                      "color": "3447003",
+                      "fields": [
+                        {"name": "Score", "value": "'"$SCORE"'", "inline": true}
+                      ],
+                      "url": "'"$URL"'"
+                    }]
+                  }'
               fi
             fi
           done
           
-          # Remove trailing comma and close array
-          ARTICLES="${ARTICLES%]}"
-          if [ "$COUNT" -gt 0 ]; then
-            ARTICLES="${ARTICLES%,}"
-          fi
-          ARTICLES="$ARTICLES]"
-          
-          echo "$ARTICLES" > news_new.json
-          echo "new_count=$COUNT" >> $GITHUB_OUTPUT
-          echo "::set-output name=new_count::$COUNT"
-          echo "New articles: $COUNT"
-
-      - name: Check for new articles
-        id: check
-        if: github.event.inputs.test_alert != 'true' && steps.fetch.outputs.new_count != '0'
-        run: |
-          set +e
-          
-          if [ -f news_prev.json ]; then
-            CURRENT_FIRST=$(jq -r '.[0].url' news_new.json 2>/dev/null)
-            PREV_FIRST=$(jq -r '.[0].url' news_prev.json 2>/dev/null || echo "")
-            
-            if [ "$CURRENT_FIRST" != "$PREV_FIRST" ] && [ -n "$CURRENT_FIRST" ]; then
-              echo "New article detected!"
-              TITLE=$(jq -r '.[0].title' news_new.json)
-              URL=$(jq -r '.[0].url' news_new.json)
-              SCORE=$(jq -r '.[0].score' news_new.json)
-              
-              echo "title=$TITLE" >> $GITHUB_OUTPUT
-              echo "url=$URL" >> $GITHUB_OUTPUT
-              echo "score=$SCORE" >> $GITHUB_OUTPUT
-              echo "has_new=true" >> $GITHUB_OUTPUT
-            else
-              echo "No new articles"
-              echo "has_new=false" >> $GITHUB_OUTPUT
-            fi
-          else
-            echo "First run - saving data"
-            echo "has_new=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Send Discord Webhook
-        if: github.event.inputs.test_alert != 'true' && steps.check.outputs.has_new == 'true'
-        env:
-          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_NEWS }}
-        run: |
-          curl -s -X POST "$DISCORD_WEBHOOK_URL" \
-            -H "Content-Type: application/json" \
-            -d '{
-              "embeds": [{
-                "title": "📰 News Alert",
-                "description": "${{ steps.check.outputs.title }}",
-                "color": "3447003",
-                "fields": [
-                  {"name": "Score", "value": "${{ steps.check.outputs.score }}", "inline": true}
-                ],
-                "url": "${{ steps.check.outputs.url }}"
-              }]
-            }'
-          echo "Alert sent!"
-
-      - name: Save current data
-        if: github.event.inputs.test_alert != 'true'
-        run: |
-          cp news_new.json news_prev.json
-          echo "Saved news_prev.json for next run"
-      - uses: actions/cache@v4
-        if: github.event.inputs.test_alert != 'true'
-        with:
-          path: news_prev.json
-          key: hn-news-data
-          save-always: true
+          echo "Alerts sent!"
