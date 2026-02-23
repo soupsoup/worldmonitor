@@ -2,7 +2,7 @@ name: Military Activity Alerts
 
 on:
   schedule:
-    - cron: '*/15 * * * *'  # Every 15 minutes
+    - cron: '*/5 * * * *'  # Every 5 minutes
   workflow_dispatch:
     inputs:
       test_alert:
@@ -17,7 +17,7 @@ jobs:
       - name: Send test alert
         if: github.event.inputs.test_alert == 'true'
         env:
-          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_NEWS }}
         run: |
           curl -s -X POST "$DISCORD_WEBHOOK_URL" \
             -H "Content-Type: application/json" \
