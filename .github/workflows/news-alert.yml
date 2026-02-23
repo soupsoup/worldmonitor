@@ -94,6 +94,7 @@ jobs:
           
           echo "$ARTICLES" > news_new.json
           echo "new_count=$COUNT" >> $GITHUB_OUTPUT
+          echo "::set-output name=new_count::$COUNT"
           echo "New articles: $COUNT"
 
       - name: Check for new articles
