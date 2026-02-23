@@ -1,0 +1,130 @@
+name: News & Intel Alerts
+
+on:
+  schedule:
+    - cron: '0 * * * *'  # Every hour
+  workflow_dispatch:
+    inputs:
+      test_alert:
+        description: 'Send test alert'
+        required: false
+        default: 'false'
+
+jobs:
+  news-alert:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send test alert
+        if: github.event.inputs.test_alert == 'true'
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          curl -s -X POST "$DISCORD_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "embeds": [{
+                "title": "🧪 News & Intel Alert - Test",
+                "description": "News alert system is working!",
+                "color": "3447003",
+                "fields": [
+                  {"name": "Status", "value": "Test successful", "inline": true}
+                ]
+              }]
+            }'
+          echo "Test alert sent!"
+
+      - uses: actions/checkout@v4
+        if: github.event.inputs.test_alert != 'true'
+
+      - name: Restore previous news data
+        id: restore
+        if: github.event.inputs.test_alert != 'true'
+        uses: actions/cache@v4
+        with:
+          path: news_prev.json
+          key: gdelt-news-data
+
+      - name: Fetch latest news
+        id: fetch
+        if: github.event.inputs.test_alert != 'true'
+        run: |
+          # Fetch top GDELT news - with rate limiting
+          sleep 1
+          # Get top English news about geopolitics, security, conflicts
+          GDELT_URL="https://api.gdeltproject.org/api/v2/doc/doc?query=(conflict OR war OR military OR crisis OR security OR attack OR invasion OR terrorism)&source=~english&mode=artlist&maxrecords=10&format=json&sort=DateDesc"
+          
+          RESPONSE=$(curl -s --max-time 10 "$GDELT_URL")
+          
+          # Check if we got JSON or an error
+          if echo "$RESPONSE" | jq -e . >/dev/null 2>&1; then
+            echo "$RESPONSE" > news_new.json
+            NEW_COUNT=$(jq '.articles | length' news_new.json 2>/dev/null || echo "0")
+          else
+            echo '{"articles": []}' > news_new.json
+            NEW_COUNT=0
+            echo "GDELT rate limited, skipping"
+          fi
+          
+          echo "new_count=$NEW_COUNT" >> $GITHUB_OUTPUT
+          echo "New news articles: $NEW_COUNT"
+
+      - name: Check for new articles
+        id: check
+        if: github.event.inputs.test_alert != 'true' && steps.fetch.outputs.new_count != '0'
+        run: |
+          # Compare with previous - get first article that differs
+          if [ -f news_prev.json ]; then
+            # Get most recent article from current fetch
+            CURRENT_FIRST=$(jq -r '.articles[0].url' news_new.json)
+            PREV_FIRST=$(jq -r '.articles[0].url' news_prev.json 2>/dev/null || echo "")
+            
+            if [ "$CURRENT_FIRST" != "$PREV_FIRST" ]; then
+              echo "New article detected!"
+              TITLE=$(jq -r '.articles[0].title' news_new.json)
+              URL=$(jq -r '.articles[0].url' news_new.json)
+              DATE=$(jq -r '.articles[0].seendate' news_new.json)
+              DOMAIN=$(jq -r '.articles[0].domain' news_new.json)
+              
+              echo "title=$TITLE" >> $GITHUB_OUTPUT
+              echo "url=$URL" >> $GITHUB_OUTPUT
+              echo "date=$DATE" >> $GITHUB_OUTPUT
+              echo "domain=$DOMAIN" >> $GITHUB_OUTPUT
+              echo "has_new=true" >> $GITHUB_OUTPUT
+            else
+              echo "No new articles"
+              echo "has_new=false" >> $GITHUB_OUTPUT
+            fi
+          else
+            # First run - just save data
+            echo "First run - saving data"
+            echo "has_new=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Send Discord Webhook
+        if: github.event.inputs.test_alert != 'true' && steps.check.outputs.has_new == 'true'
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          curl -s -X POST "$DISCORD_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "embeds": [{
+                "title": "📰 Breaking News / Intel",
+                "description": "${{ steps.check.outputs.title }}",
+                "color": "3447003",
+                "fields": [
+                  {"name": "Date", "value": "${{ steps.check.outputs.date }}", "inline": true},
+                  {"name": "Source", "value": "${{ steps.check.outputs.domain }}", "inline": true}
+                ],
+                "url": "${{ steps.check.outputs.url }}"
+              }]
+            }'
+          echo "Alert sent!"
+
+      - name: Save current news data
+        if: github.event.inputs.test_alert != 'true'
+        uses: actions/cache@v4
+        with:
+          path: news_prev.json
+          key: gdelt-news-data
+          save-always: true
