@@ -148,8 +148,12 @@ jobs:
 
       - name: Save current data
         if: github.event.inputs.test_alert != 'true'
-        uses: actions/cache@v4
+        run: |
+          cp news_new.json news_prev.json
+          echo "Saved news_prev.json for next run"
+      - uses: actions/cache@v4
+        if: github.event.inputs.test_alert != 'true'
         with:
-          path: news_new.json
+          path: news_prev.json
           key: hn-news-data
           save-always: true
