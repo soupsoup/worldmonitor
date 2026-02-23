@@ -48,21 +48,30 @@ jobs:
         id: fetch
         if: github.event.inputs.test_alert != 'true'
         run: |
+          set +e  # Don't exit on errors
+          
           # Fetch top GDELT news - with rate limiting
-          sleep 1
+          sleep 2
           # Get top English news about geopolitics, security, conflicts
           GDELT_URL="https://api.gdeltproject.org/api/v2/doc/doc?query=(conflict OR war OR military OR crisis OR security OR attack OR invasion OR terrorism)&source=~english&mode=artlist&maxrecords=10&format=json&sort=DateDesc"
           
-          RESPONSE=$(curl -s --max-time 10 "$GDELT_URL")
+          RESPONSE=$(curl -s --max-time 15 "$GDELT_URL")
           
           # Check if we got JSON or an error
           if echo "$RESPONSE" | jq -e . >/dev/null 2>&1; then
             echo "$RESPONSE" > news_new.json
             NEW_COUNT=$(jq '.articles | length' news_new.json 2>/dev/null || echo "0")
           else
-            echo '{"articles": []}' > news_new.json
-            NEW_COUNT=0
-            echo "GDELT rate limited, skipping"
+            # Rate limited - use cached data if available
+            if [ -f news_prev.json ]; then
+              cp news_prev.json news_new.json
+              NEW_COUNT=$(jq '.articles | length' news_new.json 2>/dev/null || echo "0")
+              echo "Using cached data due to rate limit"
+            else
+              echo '{"articles": []}' > news_new.json
+              NEW_COUNT=0
+              echo "GDELT rate limited, no cache available"
+            fi
           fi
           
           echo "new_count=$NEW_COUNT" >> $GITHUB_OUTPUT
