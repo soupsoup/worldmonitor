@@ -4,15 +4,38 @@ on:
   schedule:
     - cron: '*/10 * * * *'  # Every 10 minutes
   workflow_dispatch:
+    inputs:
+      test_alert:
+        description: 'Send test alert'
+        required: false
+        default: 'false'
 
 jobs:
   earthquake-alert:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Send test alert
+        if: github.event.inputs.test_alert == 'true'
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          curl -s -X POST "$DISCORD_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "embeds": [{
+                "title": "🧪 Test Alert",
+                "description": "Earthquake alert system is working!",
+                "color": "65280",
+                "fields": [
+                  {"name": "Status", "value": "Test successful", "inline": true}
+                ]
+              }]
+            }'
+          echo "Test alert sent!"
 
       - name: Restore previous earthquake data
         id: restore
+        if: github.event.inputs.test_alert != 'true'
         uses: actions/cache@v4
         with:
           path: earthquakes_prev.json
@@ -20,6 +43,7 @@ jobs:
 
       - name: Fetch latest earthquakes
         id: fetch
+        if: github.event.inputs.test_alert != 'true'
         run: |
           # Get M4.5+ earthquakes from the past hour
           curl -s "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/4.5_hour.geojson" > earthquakes_new.json
@@ -93,6 +117,7 @@ jobs:
             }'
 
       - name: Save current earthquake data
+        if: github.event.inputs.test_alert != 'true'
         uses: actions/cache@v4
         with:
           path: earthquakes_prev.json
