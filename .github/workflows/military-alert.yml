@@ -1,0 +1,34 @@
+name: Military Activity Alerts
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'  # Every 15 minutes
+  workflow_dispatch:
+    inputs:
+      test_alert:
+        description: 'Send test alert'
+        required: false
+        default: 'false'
+
+jobs:
+  military-alert:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send test alert
+        if: github.event.inputs.test_alert == 'true'
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          curl -s -X POST "$DISCORD_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "embeds": [{
+                "title": "🛩️ Military Activity Alert - Test",
+                "description": "Military activity alert system is working!",
+                "color": "16711680",
+                "fields": [
+                  {"name": "Status", "value": "Test successful", "inline": true}
+                ]
+              }]
+            }'
+          echo "Test alert sent!"
