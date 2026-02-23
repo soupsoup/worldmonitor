@@ -27,12 +27,15 @@ jobs:
           NEW_COUNT=$(jq '.features | length' earthquakes_new.json)
           echo "new_count=$NEW_COUNT" >> $GITHUB_OUTPUT
           
+          echo "New earthquakes in past hour: $NEW_COUNT"
+          
           # Check if we have previous data cached
           if [ -f earthquakes_prev.json ]; then
             PREV_COUNT=$(jq '.features | length' earthquakes_prev.json 2>/dev/null || echo "0")
-            echo "Previous: $PREV_COUNT, New: $NEW_COUNT"
+            echo "Previous earthquakes: $PREV_COUNT"
             echo "prev_count=$PREV_COUNT" >> $GITHUB_OUTPUT
           else
+            echo "No previous data found"
             echo "prev_count=0" >> $GITHUB_OUTPUT
           fi
 
