@@ -2,7 +2,7 @@ name: News & Intel Alerts
 
 on:
   schedule:
-    - cron: '0 * * * *'  # Every hour
+    - cron: '*/5 * * * *'  # Every 5 minutes
   workflow_dispatch:
     inputs:
       test_alert:
