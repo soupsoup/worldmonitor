@@ -50,8 +50,10 @@ jobs:
         run: |
           set +e
           
-          # Get top stories from Hacker News
-          TOP_STORIES=$(curl -s --max-time 10 "https://hacker-news.firebaseio.com/v0/topstories.json" 2>/dev/null | head -c 500)
+          echo "Fetching top stories..."
+          TOP_STORIES=$(curl -s --max-time 10 "https://hacker-news.firebaseio.com/v0/topstories.json")
+          
+          echo "Top stories response: ${TOP_STORIES:0:100}"
           
           if [ -z "$TOP_STORIES" ] || [ "$TOP_STORIES" = "null" ]; then
             echo '{"articles": []}' > news_new.json
@@ -63,29 +65,36 @@ jobs:
           # Get first 5 story IDs
           STORY_IDS=$(echo "$TOP_STORIES" | jq -r '.[:5] | .[]' 2>/dev/null)
           
-          ARTICLES=""
+          echo "Story IDs: $STORY_IDS"
+          
+          ARTICLES="["
           COUNT=0
           for ID in $STORY_IDS; do
+            echo "Fetching story $ID..."
             STORY=$(curl -s --max-time 5 "https://hacker-news.firebaseio.com/v0/item/$ID.json")
             if [ -n "$STORY" ] && [ "$STORY" != "null" ]; then
-              TITLE=$(echo "$STORY" | jq -r '.title // empty')
-              URL=$(echo "$STORY" | jq -r '.url // empty')
-              SCORE=$(echo "$STORY" | jq -r '.score // 0')
-              TIME=$(echo "$STORY" | jq -r '.time // 0')
+              TITLE=$(echo "$STORY" | jq -r '.title // empty' 2>/dev/null)
+              URL=$(echo "$STORY" | jq -r '.url // empty' 2>/dev/null)
+              SCORE=$(echo "$STORY" | jq -r '.score // 0' 2>/dev/null)
               
               if [ -n "$TITLE" ]; then
-                ARTICLES="$ARTICLES,{\"title\":\"$TITLE\",\"url\":\"$URL\",\"score\":$SCORE,\"time\":$TIME}"
+                echo "Found: $TITLE"
+                ARTICLES="$ARTICLES{\"title\":\"$TITLE\",\"url\":\"$URL\",\"score\":$SCORE},"
                 COUNT=$((COUNT + 1))
               fi
             fi
           done
           
-          # Remove leading comma
-          ARTICLES="[${ARTICLES#,}]"
+          # Remove trailing comma and close array
+          ARTICLES="${ARTICLES%]}"
+          if [ "$COUNT" -gt 0 ]; then
+            ARTICLES="${ARTICLES%,}"
+          fi
+          ARTICLES="$ARTICLES]"
           
           echo "$ARTICLES" > news_new.json
           echo "new_count=$COUNT" >> $GITHUB_OUTPUT
-          echo "New relevant articles: $COUNT"
+          echo "New articles: $COUNT"
 
       - name: Check for new articles
         id: check
