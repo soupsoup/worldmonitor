@@ -48,16 +48,25 @@ jobs:
         id: fetch
         if: github.event.inputs.test_alert != 'true'
         run: |
-          # Fetch GDELT civil unrest events from past 24 hours
-          # Using GDELT's geo API for protest/riot events
-          GDELT_URL="https://api.gdeltproject.org/api/v2/geo/geo?query=protest%20OR%20riot%20OR%20demonstration&mode=artlist&maxrecords=50&format=json&sort=DateDesc"
+          # Fetch GDELT civil unrest events - with rate limiting handling
+          # Use a cached query with lower frequency
+          sleep 1
+          GDELT_URL="https://api.gdeltproject.org/api/v2/doc/doc?query=protest%20OR%20riot%20OR%20demonstration&mode=artlist&maxrecords=25&format=json&sort=DateDesc"
           
-          curl -s "$GDELT_URL" > gdelt_new.json
+          RESPONSE=$(curl -s --max-time 10 "$GDELT_URL")
           
-          # Count events
-          NEW_COUNT=$(jq '.articles | length' gdelt_new.json 2>/dev/null || echo "0")
+          # Check if we got JSON or an error
+          if echo "$RESPONSE" | jq -e . >/dev/null 2>&1; then
+            echo "$RESPONSE" > gdelt_new.json
+            NEW_COUNT=$(jq '.articles | length' gdelt_new.json 2>/dev/null || echo "0")
+          else
+            # Rate limited or error - create empty response
+            echo '{"articles": []}' > gdelt_new.json
+            NEW_COUNT=0
+            echo "GDELT rate limited or error, skipping this run"
+          fi
+          
           echo "new_count=$NEW_COUNT" >> $GITHUB_OUTPUT
-          
           echo "New civil unrest articles: $NEW_COUNT"
           
           # Check cache
