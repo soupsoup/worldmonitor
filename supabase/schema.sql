@@ -34,6 +34,10 @@ create table if not exists discord_subscriptions (
 create unique index if not exists discord_subscriptions_guild_channel_idx
   on discord_subscriptions (guild_id, channel_id);
 
+-- Constraint to prevent new unrest subscriptions (deprecated)
+alter table discord_subscriptions
+  add constraint discord_subscriptions_no_unrest check (not ('unrest' = any(alert_types)));
+
 -- Index for alert type lookup (dispatcher queries by alert_type using @>)
 create index if not exists discord_subscriptions_alert_types_idx
   on discord_subscriptions using gin (alert_types);

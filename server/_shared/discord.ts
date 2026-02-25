@@ -165,34 +165,7 @@ export function buildWildfireEmbed(fire: {
   };
 }
 
-export function buildUnrestEmbed(event: {
-  id: string;
-  title: string;
-  country: string;
-  city: string;
-  eventType: string;
-  severity: string;
-  fatalities: number;
-  occurredAt: number;
-}): DiscordEmbed {
-  const color = event.severity === 'SEVERITY_LEVEL_HIGH' ? COLORS.high
-    : event.severity === 'SEVERITY_LEVEL_MEDIUM' ? COLORS.medium
-    : COLORS.low;
-
-  return {
-    title: `Civil Unrest — ${event.eventType.replace('UNREST_EVENT_TYPE_', '').replace(/_/g, ' ')}`,
-    description: event.title,
-    color,
-    timestamp: new Date(event.occurredAt).toISOString(),
-    fields: [
-      { name: 'Location', value: `${event.city ? event.city + ', ' : ''}${event.country}`, inline: true },
-      { name: 'Severity', value: event.severity.replace('SEVERITY_LEVEL_', ''), inline: true },
-      ...(event.fatalities > 0 ? [{ name: 'Fatalities', value: String(event.fatalities), inline: true }] : []),
-    ],
-    footer: { text: 'World Monitor · ACLED / GDELT', icon_url: 'https://worldmonitor.app/favico/favicon-32x32.png' },
-    author: { name: 'Unrest Alert', icon_url: 'https://worldmonitor.app/favico/favicon-32x32.png' },
-  };
-}
+// Civil unrest embeds removed along with alert type; legacy code kept for reference
 
 export function buildMilitaryEmbed(flight: {
   id: string;

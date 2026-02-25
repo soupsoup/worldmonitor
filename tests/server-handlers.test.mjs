@@ -228,3 +228,36 @@ describe('getVesselSnapshot caching (HIGH-1)', () => {
   // NOTE: Full integration test (mocking fetch, verifying cache hits) requires
   // a TypeScript-capable test runner. This structural test verifies the pattern.
 });
+
+// ---------------------------------------------------------------------------
+// 7. Discord alert deprecation checks
+// ---------------------------------------------------------------------------
+
+describe('Discord alert subsystem', () => {
+
+  it('does not expose `unrest` in ALL_ALERT_TYPES (interactions.ts)', () => {
+    const src = readSrc('api/discord/interactions.ts');
+    assert.doesNotMatch(src, /unrest/, 'interactions.ts should no longer mention unrest');
+  });
+
+  it('interactions.js compiled copy should also omit unrest', () => {
+    const src = readSrc('api/discord/interactions.js');
+    assert.doesNotMatch(src, /unrest/, 'compiled interactions.js should not contain unrest');
+  });
+
+  it('default subscription created by oauth.ts excludes unrest', () => {
+    const src = readSrc('api/discord/oauth.ts');
+    assert.doesNotMatch(src, /'unrest'/, 'oauth.ts should not include unrest in default array');
+  });
+
+  it('dispatch.ts has removed dispatchUnrest and RPC call', () => {
+    const src = readSrc('api/discord/dispatch.ts');
+    assert.doesNotMatch(src, /dispatchUnrest/, 'dispatch.ts should not define or call dispatchUnrest');
+    assert.doesNotMatch(src, /callRpc\('unrest'/, 'dispatch.ts should not query unrest RPC');
+  });
+
+  it('supabase type definition no longer lists unrest', () => {
+    const src = readSrc('server/_shared/supabase.ts');
+    assert.doesNotMatch(src, /\| 'unrest'/, 'AlertType union should not include unrest');
+  });
+});

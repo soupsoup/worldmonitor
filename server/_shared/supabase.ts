@@ -21,8 +21,7 @@ export type AlertType =
   | 'earthquakes'
   | 'wildfires'
   | 'markets'
-  | 'infrastructure'
-  | 'unrest';
+  | 'infrastructure';
 
 export const ALL_ALERT_TYPES: AlertType[] = [
   'conflicts',
@@ -32,7 +31,6 @@ export const ALL_ALERT_TYPES: AlertType[] = [
   'wildfires',
   'markets',
   'infrastructure',
-  'unrest',
 ];
 
 export interface DiscordGuild {

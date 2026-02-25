@@ -18,7 +18,6 @@ import {
   buildEarthquakeEmbed,
   buildCyberEmbed,
   buildWildfireEmbed,
-  buildUnrestEmbed,
   buildInfrastructureEmbed,
   buildMarketEmbed,
   sendWebhook,
@@ -152,17 +151,7 @@ async function dispatchWildfires(subs: DiscordSubscription[]): Promise<void> {
   }
 }
 
-async function dispatchUnrest(subs: DiscordSubscription[]): Promise<void> {
-  const data = await callRpc('unrest', 'list-unrest-events', {
-    timeRange: { start: Date.now() - 3 * 60 * 60 * 1000 },
-  });
-  for (const event of data?.events ?? []) {
-    if (event.severity !== 'SEVERITY_LEVEL_HIGH') continue;
-    if (await wasAlreadySent(`unrest:${event.id}`)) continue;
-    await fanOut(subs, 'unrest', { embeds: [buildUnrestEmbed(event)] });
-    await markSent(`unrest:${event.id}`);
-  }
-}
+// unrest dispatch logic removed; we no longer poll or deliver civil unrest alerts
 
 async function dispatchInfrastructure(subs: DiscordSubscription[]): Promise<void> {
   const data = await callRpc('infrastructure', 'list-internet-outages', {});
@@ -228,7 +217,7 @@ export default async function handler(req: Request): Promise<Response> {
     dispatchEarthquakes(subs),
     dispatchCyber(subs),
     dispatchWildfires(subs),
-    dispatchUnrest(subs),
+    // unrest dispatch removed per alert deprecation
     dispatchInfrastructure(subs),
     dispatchMarkets(subs),
   ]);

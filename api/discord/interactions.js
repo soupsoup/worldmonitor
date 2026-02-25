@@ -17,7 +17,7 @@ const InteractionResponseType = {
 
 const ALL_ALERT_TYPES = [
   'conflicts', 'military', 'cyber', 'earthquakes',
-  'wildfires', 'markets', 'infrastructure', 'unrest',
+  'wildfires', 'markets', 'infrastructure',
 ];
 
 function json(data, status = 200) {

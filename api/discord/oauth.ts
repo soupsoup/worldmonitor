@@ -88,7 +88,7 @@ export default async function handler(req: Request): Promise<Response> {
         guild_id: guild['id'] as string,
         channel_id: (webhook['channel_id'] as string) ?? '',
         webhook_url: webhook['url'] as string,
-        alert_types: ['conflicts', 'earthquakes', 'cyber', 'unrest'],
+        alert_types: ['conflicts', 'earthquakes', 'cyber'],
         active: true,
       });
     }

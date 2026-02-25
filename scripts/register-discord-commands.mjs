@@ -26,7 +26,7 @@ const ALERT_TYPE_CHOICES = [
   { name: 'Wildfires', value: 'wildfires' },
   { name: 'Markets', value: 'markets' },
   { name: 'Infrastructure Outages', value: 'infrastructure' },
-  { name: 'Civil Unrest', value: 'unrest' },
+  // Civil unrest alerts have been removed; historical subscriptions will be ignored
 ];
 
 const commands = [
